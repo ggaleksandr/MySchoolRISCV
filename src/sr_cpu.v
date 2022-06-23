@@ -17,12 +17,20 @@ module sr_cpu
     input   [ 4:0]  regAddr,    // debug access reg address
     output  [31:0]  regData,    // debug access reg data
     output  [31:0]  imAddr,     // instruction memory address
-    input   [31:0]  imData      // instruction memory data
+    input   [31:0]  imData,     // instruction memory data
+
+    output          dmWe,       // data memory write enable
+    output  [31:0]  dmA,        // data memory address
+    output  [31:0]  dmWd,       // data memory write data
+    input   [31:0]  dmRd        // data memory read data
 );
     //control wires
     wire        aluZero;
     wire        pcSrc;
     wire        regWrite;
+    wire        memWrite;
+    wire        resultSrc;
+    wire        immSrc;
     wire        aluSrc;
     wire        wdSrc;
     wire  [2:0] aluControl;
@@ -37,6 +45,7 @@ module sr_cpu
     wire [31:0] immI;
     wire [31:0] immB;
     wire [31:0] immU;
+    wire [31:0] immS;
 
     //program counter
     wire [31:0] pc;
@@ -60,7 +69,8 @@ module sr_cpu
         .cmdF7      ( cmdF7        ),
         .immI       ( immI         ),
         .immB       ( immB         ),
-        .immU       ( immU         ) 
+        .immU       ( immU         ),
+        .immS       ( immS         )  
     );
 
     //register file
@@ -86,8 +96,10 @@ module sr_cpu
     assign regData = (regAddr != 0) ? rd0 : pc;
 
     //alu
-    wire [31:0] srcB = aluSrc ? immI : rd2;
+    wire [31:0] immLS = immSrc ? immS : immI;
+    wire [31:0] srcB = aluSrc ? immLS : rd2;
     wire [31:0] aluResult;
+    wire [31:0] ReadData;
 
     sr_alu alu (
         .srcA       ( rd1          ),
@@ -97,7 +109,8 @@ module sr_cpu
         .result     ( aluResult    ) 
     );
 
-    assign wd3 = wdSrc ? immU : aluResult;
+    wire [31:0] Result = resultSrc ? ReadData : aluResult;
+    assign wd3 = wdSrc ? immU : Result;
 
     //control
     sr_control sm_control (
@@ -109,9 +122,17 @@ module sr_cpu
         .regWrite   ( regWrite     ),
         .aluSrc     ( aluSrc       ),
         .wdSrc      ( wdSrc        ),
-        .aluControl ( aluControl   ) 
+        .aluControl ( aluControl   ),
+        .immSrc     ( immSrc       ),
+        .memWrite   ( memWrite     ),
+        .resultSrc  ( resultSrc    )
     );
 
+    //data memory access
+    assign dmWe = memWrite;
+    assign dmA = aluResult;
+    assign dmWd = rd2;
+    assign ReadData = dmRd;
 endmodule
 
 module sr_decode
@@ -125,7 +146,8 @@ module sr_decode
     output     [ 6:0] cmdF7,
     output reg [31:0] immI,
     output reg [31:0] immB,
-    output reg [31:0] immU 
+    output reg [31:0] immU,
+    output reg [31:0] immS  
 );
     assign cmdOp = instr[ 6: 0];
     assign rd    = instr[11: 7];
@@ -155,6 +177,13 @@ module sr_decode
         immU[31:12] = instr[31:12];
     end
 
+    // S-immediate
+    always @ (*) begin
+        immS[ 4: 0] = instr[11:7];
+        immS[10: 5] = instr[30:25];
+        immS[31:11] = { 20 {instr[31]} };
+    end
+
 endmodule
 
 module sr_control
@@ -167,7 +196,10 @@ module sr_control
     output reg       regWrite, 
     output reg       aluSrc,
     output reg       wdSrc,
-    output reg [2:0] aluControl
+    output reg [2:0] aluControl,
+    output reg       immSrc,
+    output reg       memWrite,
+    output reg       resultSrc
 );
     reg          branch;
     reg          condZero;
@@ -180,6 +212,9 @@ module sr_control
         aluSrc      = 1'b0;
         wdSrc       = 1'b0;
         aluControl  = `ALU_ADD;
+        immSrc      = 1'b0;
+        memWrite    = 1'b0;
+        resultSrc   = 1'b0;
 
         casez( {cmdF7, cmdF3, cmdOp} )
             { `RVF7_ADD,  `RVF3_ADD,  `RVOP_ADD  } : begin regWrite = 1'b1; aluControl = `ALU_ADD;  end
@@ -193,6 +228,16 @@ module sr_control
 
             { `RVF7_ANY,  `RVF3_BEQ,  `RVOP_BEQ  } : begin branch = 1'b1; condZero = 1'b1; aluControl = `ALU_SUB; end
             { `RVF7_ANY,  `RVF3_BNE,  `RVOP_BNE  } : begin branch = 1'b1; aluControl = `ALU_SUB; end
+
+            { `RVF7_ANY,  `RVF3_LW,   `RVOP_LW   } : begin regWrite = 1'b1; aluSrc = 1'b1; aluControl = `ALU_ADD; resultSrc = 1'b1; end
+            { `RVF7_ANY,  `RVF3_LH,   `RVOP_LH   } : begin regWrite = 1'b1; aluSrc = 1'b1; aluControl = `ALU_ADD; resultSrc = 1'b1; end
+            { `RVF7_ANY,  `RVF3_LB,   `RVOP_LB   } : begin regWrite = 1'b1; aluSrc = 1'b1; aluControl = `ALU_ADD; resultSrc = 1'b1; end
+            { `RVF7_ANY,  `RVF3_LHU,  `RVOP_LHU  } : begin regWrite = 1'b1; aluSrc = 1'b1; aluControl = `ALU_ADD; resultSrc = 1'b1; end
+            { `RVF7_ANY,  `RVF3_LBU,  `RVOP_LBU  } : begin regWrite = 1'b1; aluSrc = 1'b1; aluControl = `ALU_ADD; resultSrc = 1'b1; end
+
+            { `RVF7_ANY,  `RVF3_SW,   `RVOP_SW   } : begin aluSrc = 1'b1; aluControl = `ALU_ADD; immSrc  = 1'b1;  memWrite = 1'b1; end
+            { `RVF7_ANY,  `RVF3_SH,   `RVOP_SH   } : begin aluSrc = 1'b1; aluControl = `ALU_ADD; immSrc  = 1'b1;  memWrite = 1'b1; end
+            { `RVF7_ANY,  `RVF3_SB,   `RVOP_SB   } : begin aluSrc = 1'b1; aluControl = `ALU_ADD; immSrc  = 1'b1;  memWrite = 1'b1; end
         endcase
     end
 endmodule

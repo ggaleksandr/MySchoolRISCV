@@ -25,6 +25,17 @@
 `define RVOP_SRL    7'b0110011
 `define RVOP_SLTU   7'b0110011
 `define RVOP_SUB    7'b0110011
+//`define RVOP_LD   RV64 insturcion
+`define RVOP_LW     7'b0000011
+`define RVOP_LH     7'b0000011
+`define RVOP_LB     7'b0000011
+//`define RVOP_LWU  RV64 insturcion
+`define RVOP_LHU    7'b0000011
+`define RVOP_LBU    7'b0000011
+//`define RVOP_SD   RV64 insturcion   
+`define RVOP_SW     7'b0100011
+`define RVOP_SH     7'b0100011
+`define RVOP_SB     7'b0100011
 
 // instruction funct3
 `define RVF3_ADDI   3'b000
@@ -35,6 +46,17 @@
 `define RVF3_SRL    3'b101
 `define RVF3_SLTU   3'b011
 `define RVF3_SUB    3'b000
+//`define RVF3_LD   RV64 insturcion
+`define RVF3_LW     3'b010
+`define RVF3_LH     3'b001
+`define RVF3_LB     3'b000
+//`define RVF3_LWU  RV64 insturcion
+`define RVF3_LHU    3'b101
+`define RVF3_LBU    3'b100
+//`define RVF3_SD   RV64 insturcion
+`define RVF3_SW     3'b010
+`define RVF3_SH     3'b001
+`define RVF3_SB     3'b000
 `define RVF3_ANY    3'b???
 
 // instruction funct7

@@ -44,6 +44,20 @@ module sm_top
     wire    [31:0]  imData;
     sm_rom reset_rom(imAddr, imData);
 
+    //data memory
+    wire            dmWe;
+    wire    [31:0]  dmWd;
+    wire    [31:0]  dmRd;
+    wire    [31:0]  dmA;
+    sm_dm dm
+    (
+        .clk    ( clk   ),
+        .we     ( dmWe  ),
+        .a      ( dmA   ),
+        .wd     ( dmWd  ),
+        .rd     ( dmRd  )
+    );
+
     sr_cpu sm_cpu
     (
         .clk        ( clk       ),
@@ -51,7 +65,11 @@ module sm_top
         .regAddr    ( addr      ),
         .regData    ( regData   ),
         .imAddr     ( imAddr    ),
-        .imData     ( imData    )
+        .imData     ( imData    ),
+        .dmWe       ( dmWe      ),
+        .dmWd       ( dmWd      ),
+        .dmRd       ( dmRd      ),
+        .dmA        ( dmA       )
     );
 
 endmodule
