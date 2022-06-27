@@ -46,16 +46,18 @@ module sm_top
 
     //data memory
     wire            dmWe;
+    wire    [ 1:0]  dmAlign; // data alignment
     wire    [31:0]  dmWd;
     wire    [31:0]  dmRd;
     wire    [31:0]  dmA;
     sm_dm dm
     (
-        .clk    ( clk   ),
-        .we     ( dmWe  ),
-        .a      ( dmA   ),
-        .wd     ( dmWd  ),
-        .rd     ( dmRd  )
+        .clk    ( clk       ),
+        .we     ( dmWe      ),
+        .da     ( dmAlign   ),
+        .a      ( dmA       ),
+        .wd     ( dmWd      ),
+        .rd     ( dmRd      )
     );
 
     sr_cpu sm_cpu
@@ -67,6 +69,7 @@ module sm_top
         .imAddr     ( imAddr    ),
         .imData     ( imData    ),
         .dmWe       ( dmWe      ),
+        .dmAlign    ( dmAlign   ),
         .dmWd       ( dmWd      ),
         .dmRd       ( dmRd      ),
         .dmA        ( dmA       )

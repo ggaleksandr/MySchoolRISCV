@@ -20,6 +20,7 @@ module sr_cpu
     input   [31:0]  imData,     // instruction memory data
 
     output          dmWe,       // data memory write enable
+    output  [ 1:0]	dmAlign,         // data alignment
     output  [31:0]  dmA,        // data memory address
     output  [31:0]  dmWd,       // data memory write data
     input   [31:0]  dmRd        // data memory read data
@@ -29,11 +30,17 @@ module sr_cpu
     wire        pcSrc;
     wire        regWrite;
     wire        memWrite;
+    wire        dmAlign;
     wire        resultSrc;
     wire        immSrc;
     wire        aluSrc;
     wire        wdSrc;
+    wire        opType;
+    wire        extType;
+    wire  [1:0] bSize;
     wire  [2:0] aluControl;
+    wire [31:0] dataOutExt;
+    wire [31:0] dataInExt;
 
     //instruction decode wires
     wire [ 6:0] cmdOp;
@@ -96,8 +103,8 @@ module sr_cpu
     assign regData = (regAddr != 0) ? rd0 : pc;
 
     //alu
-    wire [31:0] immLS = immSrc ? immS : immI;
-    wire [31:0] srcB = aluSrc ? immLS : rd2;
+    wire [31:0] immIS = immSrc ? immS : immI;
+    wire [31:0] srcB = aluSrc ? immIS : rd2;
     wire [31:0] aluResult;
     wire [31:0] ReadData;
 
@@ -109,7 +116,7 @@ module sr_cpu
         .result     ( aluResult    ) 
     );
 
-    wire [31:0] Result = resultSrc ? ReadData : aluResult;
+    wire [31:0] Result = resultSrc ? dataOutExt : aluResult;
     assign wd3 = wdSrc ? immU : Result;
 
     //control
@@ -124,15 +131,29 @@ module sr_cpu
         .wdSrc      ( wdSrc        ),
         .aluControl ( aluControl   ),
         .immSrc     ( immSrc       ),
+        .dmAlign    ( dmAlign      ),
         .memWrite   ( memWrite     ),
-        .resultSrc  ( resultSrc    )
+        .resultSrc  ( resultSrc    ),
+        .opType     ( opType       ),
+        .extType    ( extType      ),
+        .bSize      ( bSize        )
     );
 
     //data memory access
+    sr_extend sm_extend (
+        .extType    ( extType       ),
+        .bSize      ( bSize         ),
+        .dataInExt  ( dataInExt     ),
+        .dataOutExt ( dataOutExt    )
+    );
+
+    assign dataInExt = opType ? rd2 : dmRd;
+
     assign dmWe = memWrite;
     assign dmA = aluResult;
-    assign dmWd = rd2;
+    assign dmWd = dataOutExt;
     assign ReadData = dmRd;
+
 endmodule
 
 module sr_decode
@@ -188,33 +209,41 @@ endmodule
 
 module sr_control
 (
-    input     [ 6:0] cmdOp,
-    input     [ 2:0] cmdF3,
-    input     [ 6:0] cmdF7,
-    input            aluZero,
-    output           pcSrc, 
-    output reg       regWrite, 
-    output reg       aluSrc,
-    output reg       wdSrc,
-    output reg [2:0] aluControl,
-    output reg       immSrc,
-    output reg       memWrite,
-    output reg       resultSrc
+    input      [ 6:0] cmdOp,
+    input      [ 2:0] cmdF3,
+    input      [ 6:0] cmdF7,
+    input             aluZero,
+    output            pcSrc, 
+    output reg        regWrite, 
+    output reg        aluSrc,
+    output reg        wdSrc,
+    output reg [ 2:0] aluControl,
+    output reg        immSrc,
+    output reg        memWrite,
+    output reg [ 1:0] dmAlign,
+    output reg        resultSrc,
+    output reg        opType,
+    output reg        extType,
+    output reg [ 1:0] bSize
 );
     reg          branch;
     reg          condZero;
     assign pcSrc = branch & (aluZero == condZero);
 
     always @ (*) begin
-        branch      = 1'b0;
-        condZero    = 1'b0;
-        regWrite    = 1'b0;
-        aluSrc      = 1'b0;
-        wdSrc       = 1'b0;
-        aluControl  = `ALU_ADD;
-        immSrc      = 1'b0;
-        memWrite    = 1'b0;
-        resultSrc   = 1'b0;
+        branch          = 1'b0;
+        condZero        = 1'b0;
+        regWrite        = 1'b0;
+        aluSrc          = 1'b0;
+        wdSrc           = 1'b0;
+        aluControl      = `ALU_ADD;
+        immSrc          = 1'b0;
+        memWrite        = 1'b0;
+        dmAlign         = `WORD;
+        resultSrc       = 1'b0;
+        opType          = 1'b0;
+        extType         = 1'b0;
+        bSize           = `EXT32BITS;
 
         casez( {cmdF7, cmdF3, cmdOp} )
             { `RVF7_ADD,  `RVF3_ADD,  `RVOP_ADD  } : begin regWrite = 1'b1; aluControl = `ALU_ADD;  end
@@ -229,15 +258,16 @@ module sr_control
             { `RVF7_ANY,  `RVF3_BEQ,  `RVOP_BEQ  } : begin branch = 1'b1; condZero = 1'b1; aluControl = `ALU_SUB; end
             { `RVF7_ANY,  `RVF3_BNE,  `RVOP_BNE  } : begin branch = 1'b1; aluControl = `ALU_SUB; end
 
-            { `RVF7_ANY,  `RVF3_LW,   `RVOP_LW   } : begin regWrite = 1'b1; aluSrc = 1'b1; aluControl = `ALU_ADD; resultSrc = 1'b1; end
-            { `RVF7_ANY,  `RVF3_LH,   `RVOP_LH   } : begin regWrite = 1'b1; aluSrc = 1'b1; aluControl = `ALU_ADD; resultSrc = 1'b1; end
-            { `RVF7_ANY,  `RVF3_LB,   `RVOP_LB   } : begin regWrite = 1'b1; aluSrc = 1'b1; aluControl = `ALU_ADD; resultSrc = 1'b1; end
-            { `RVF7_ANY,  `RVF3_LHU,  `RVOP_LHU  } : begin regWrite = 1'b1; aluSrc = 1'b1; aluControl = `ALU_ADD; resultSrc = 1'b1; end
-            { `RVF7_ANY,  `RVF3_LBU,  `RVOP_LBU  } : begin regWrite = 1'b1; aluSrc = 1'b1; aluControl = `ALU_ADD; resultSrc = 1'b1; end
+            { `RVF7_ANY,  `RVF3_LW,   `RVOP_LW   } : begin regWrite = 1'b1; aluSrc = 1'b1; aluControl = `ALU_ADD; resultSrc = 1'b1; dmAlign = `WORD; end
+            { `RVF7_ANY,  `RVF3_LH,   `RVOP_LH   } : begin regWrite = 1'b1; aluSrc = 1'b1; aluControl = `ALU_ADD; resultSrc = 1'b1; dmAlign = `HALFWORD; bSize = `EXT16BITS; end
+            { `RVF7_ANY,  `RVF3_LB,   `RVOP_LB   } : begin regWrite = 1'b1; aluSrc = 1'b1; aluControl = `ALU_ADD; resultSrc = 1'b1; dmAlign = `BYTE; bSize = `EXT8BITS;  end
 
-            { `RVF7_ANY,  `RVF3_SW,   `RVOP_SW   } : begin aluSrc = 1'b1; aluControl = `ALU_ADD; immSrc  = 1'b1;  memWrite = 1'b1; end
-            { `RVF7_ANY,  `RVF3_SH,   `RVOP_SH   } : begin aluSrc = 1'b1; aluControl = `ALU_ADD; immSrc  = 1'b1;  memWrite = 1'b1; end
-            { `RVF7_ANY,  `RVF3_SB,   `RVOP_SB   } : begin aluSrc = 1'b1; aluControl = `ALU_ADD; immSrc  = 1'b1;  memWrite = 1'b1; end
+            { `RVF7_ANY,  `RVF3_LHU,  `RVOP_LHU  } : begin regWrite = 1'b1; aluSrc = 1'b1; aluControl = `ALU_ADD; resultSrc = 1'b1; dmAlign = `HALFWORD;    extType = 1'b1; bSize = `EXT16BITS; end
+            { `RVF7_ANY,  `RVF3_LBU,  `RVOP_LBU  } : begin regWrite = 1'b1; aluSrc = 1'b1; aluControl = `ALU_ADD; resultSrc = 1'b1; dmAlign = `BYTE;        extType = 1'b1; bSize = `EXT8BITS; end
+
+            { `RVF7_ANY,  `RVF3_SW,   `RVOP_SW   } : begin aluSrc = 1'b1; aluControl = `ALU_ADD; immSrc  = 1'b1;  dmAlign = `WORD;      memWrite = 1'b1; opType = 1'b1; extType = 1'b1; end
+            { `RVF7_ANY,  `RVF3_SH,   `RVOP_SH   } : begin aluSrc = 1'b1; aluControl = `ALU_ADD; immSrc  = 1'b1;  dmAlign = `HALFWORD;  memWrite = 1'b1; opType = 1'b1; extType = 1'b1; bSize = `EXT16BITS; end
+            { `RVF7_ANY,  `RVF3_SB,   `RVOP_SB   } : begin aluSrc = 1'b1; aluControl = `ALU_ADD; immSrc  = 1'b1;  dmAlign = `BYTE;      memWrite = 1'b1; opType = 1'b1; extType = 1'b1; bSize = `EXT8BITS; end
         endcase
     end
 endmodule
@@ -285,4 +315,32 @@ module sm_register_file
 
     always @ (posedge clk)
         if(we3) rf [a3] <= wd3;
+endmodule
+
+module sr_extend
+(
+    input               extType,    //control that defines bit extention mode: zero-ext(1) or sign-ext(0)  
+    input       [ 1:0]  bSize,      //controls how much bits must be extended: word (32 bits), halfword (16 bits), byte (8 bits)
+    input       [31:0]  dataInExt,
+    output reg  [31:0]  dataOutExt
+);
+    reg [31:0]  mask;
+
+    always @ (*) begin
+        case (bSize)
+            default     : dataOutExt = dataInExt;
+
+            `EXT8BITS   :   begin 
+                mask = {{24{1'b0}},{8{1'b1}}};
+                dataOutExt = extType ? (dataInExt & mask) : ({{24{dataInExt[7]}}, dataInExt[7:0]}); 
+            end
+            
+            `EXT16BITS  :   begin 
+                mask = {{16{1'b0}},{16{1'b1}}};
+                dataOutExt = extType ? (dataInExt & mask) : ({{16{dataInExt[15]}}, dataInExt[15:0]}); 
+            end
+            
+            `EXT32BITS  : dataOutExt = dataInExt;
+        endcase
+    end
 endmodule

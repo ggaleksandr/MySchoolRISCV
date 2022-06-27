@@ -67,3 +67,12 @@
 `define RVF7_SUB    7'b0100000
 `define RVF7_ANY    7'b???????
 
+//Extend unit controls
+`define EXT8BITS    2'b00
+`define EXT16BITS   2'b01
+`define EXT32BITS   2'b10
+
+//Memory alligment commands
+`define BYTE        2'b00
+`define HALFWORD    2'b01
+`define WORD        2'b10

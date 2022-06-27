@@ -104,17 +104,17 @@ module sm_testbench;
             { `RVF7_ANY,  `RVF3_BEQ,  `RVOP_BEQ  } : $write ("beq   $%1d, $%1d, 0x%8h (%1d)", rs1, rs2, immB, immB);
             { `RVF7_ANY,  `RVF3_BNE,  `RVOP_BNE  } : $write ("bne   $%1d, $%1d, 0x%8h (%1d)", rs1, rs2, immB, immB);
 
-            { `RVF7_ANY,  `RVF3_LW,   `RVOP_LW   } : $write ("lw   $%1d, 0x%8h (%1d) ", rd, immI, rs1);
+            { `RVF7_ANY,  `RVF3_LW,   `RVOP_LW   } : $write ("lw   $%1d, 0x%8h ($%1d) ", rd, immI, rs1);
             //todo: imm bit lenght fix
-            { `RVF7_ANY,  `RVF3_LH,   `RVOP_LH   } : $write ("lh   $%1d, 0x%8h (%1d) ", rd, immI, rs1);
-            { `RVF7_ANY,  `RVF3_LB,   `RVOP_LB   } : $write ("lb   $%1d, 0x%8h (%1d) ", rd, immI, rs1);
-            { `RVF7_ANY,  `RVF3_LHU,  `RVOP_LHU  } : $write ("lhu  $%1d, 0x%8h (%1d) ", rd, immI, rs1);
-            { `RVF7_ANY,  `RVF3_LBU,  `RVOP_LBU  } : $write ("lbu  $%1d, 0x%8h (%1d) ", rd, immI, rs1);
+            { `RVF7_ANY,  `RVF3_LH,   `RVOP_LH   } : $write ("lh   $%1d, 0x%8h ($%1d) ", rd, immI, rs1);
+            { `RVF7_ANY,  `RVF3_LB,   `RVOP_LB   } : $write ("lb   $%1d, 0x%8h ($%1d) ", rd, immI, rs1);
+            { `RVF7_ANY,  `RVF3_LHU,  `RVOP_LHU  } : $write ("lhu  $%1d, 0x%8h ($%1d) ", rd, immI, rs1);
+            { `RVF7_ANY,  `RVF3_LBU,  `RVOP_LBU  } : $write ("lbu  $%1d, 0x%8h ($%1d) ", rd, immI, rs1);
 
-            { `RVF7_ANY,  `RVF3_SW,   `RVOP_SW   } : $write ("sw   $%1d, 0x%8h (%1d) ", rs2, immS, rs1);
+            { `RVF7_ANY,  `RVF3_SW,   `RVOP_SW   } : $write ("sw   $%1d, 0x%8h ($%1d) ", rs2, immS, rs1);
             //todo: imm bit lenght fix
-            { `RVF7_ANY,  `RVF3_SH,   `RVOP_SH   } : $write ("sh   $%1d, 0x%8h (%1d) ", rs2, immS, rs1);
-            { `RVF7_ANY,  `RVF3_SB,   `RVOP_SB   } : $write ("sb   $%1d, 0x%8h (%1d) ", rs2, immS, rs1);
+            { `RVF7_ANY,  `RVF3_SH,   `RVOP_SH   } : $write ("sh   $%1d, 0x%8h ($%1d) ", rs2, immS, rs1);
+            { `RVF7_ANY,  `RVF3_SB,   `RVOP_SB   } : $write ("sb   $%1d, 0x%8h ($%1d) ", rs2, immS, rs1);
         endcase
     end
     endtask
